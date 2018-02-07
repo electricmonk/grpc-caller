@@ -28,7 +28,7 @@ module.exports = caller
  * const services = require('./static/helloworld_grpc_pb')
  * const client = caller('localhost:50051', services.GreeterClient)
  */
-function caller (host, proto, name, options) {
+function caller (host, proto, name, options, errorHandler) {
   let Ctor
   if (_.isString(proto)  || (_.isObject(proto) && proto.root && proto.file)) {
     const loaded = grpc.load(proto)
@@ -45,6 +45,12 @@ function caller (host, proto, name, options) {
     Ctor = proto
     options = name
   }
+
+  if (_.isFunction(options) && !errorHandler) {
+    errorHandler = options;
+    options = null;
+  }
+
 
   // promisify the client
   const clientProto = Ctor.prototype
@@ -65,7 +71,19 @@ function caller (host, proto, name, options) {
           }
           const args = _.compact([arg, metadata, options, fn])
             // only promisify-call functions in simple response / request scenario
-          return pc(this, v, ...args)
+          const call = pc(this, v, ...args)
+          if (!!call && !!call.catch) {
+            return call.catch(err => {
+              err.serviceName = name;
+              err.method = k;
+              err.endpoint = this.$channel.getTarget();
+              err.message = `Got response [${err.message}] trying to call method [${err.method}] service [${err.serviceName}] at endpoint [${err.endpoint}]`;
+              if (errorHandler) errorHandler(err);
+              throw err;
+            })
+          } else {
+            return call;
+          }
         }
       } else if (v.responseStream && !v.requestStream) {
         clientProto[k] = function (arg, metadata, options) {

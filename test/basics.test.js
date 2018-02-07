@@ -1,6 +1,7 @@
 import test from 'ava'
 import path from 'path'
 import async from 'async'
+const _ = require('lodash')
 const grpc = require('grpc')
 
 const caller = require('../')
@@ -13,11 +14,11 @@ const helloproto = grpc.load(PROTO_PATH).helloworld
 
 const apps = []
 
-function getRandomInt (min, max) {
+function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-function getHost (port) {
+function getHost(port) {
   return '0.0.0.0:'.concat(port || getRandomInt(1000, 60000))
 }
 
@@ -110,7 +111,7 @@ test('call dynamic service using async', async t => {
 test('call dynamic service using async and root, file', async t => {
   t.plan(3)
   const client = caller(DYNAMIC_HOST, { root: PROTO_ROOT, file: PROTO_FILE }, 'Greeter')
-  const response = await client.sayHello({ name: 'Root' })
+  const response = await client.sayHello({ name: 'Root' }).catch(err => console.log(JSON.stringify(err)));
   t.truthy(response)
   t.truthy(response.message)
   t.is(response.message, 'Hello Root')
@@ -123,10 +124,10 @@ test('call static service using async', async t => {
   const services = require('./static/helloworld_grpc_pb')
 
   const client = caller(STATIC_HOST, services.GreeterClient)
-
   const request = new messages.HelloRequest()
   request.setName('Jane')
-  const response = await client.sayHello(request)
+
+  const response = await client.sayHello(request);
   t.truthy(response)
   t.truthy(response.getMessage)
   const msg = response.getMessage()
